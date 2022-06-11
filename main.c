@@ -30,6 +30,8 @@
  #include "jpg.h"
 #endif
 
+#define CENTER true
+
 /* Top-level globals */
 static struct wl_display *display;
 static struct wl_registry *registry;
@@ -87,6 +89,14 @@ render(struct output *output)
     double sx = (double)img_width / (width * scale);
     double sy = (double)img_height / (height * scale);
 
+    double tx = 0, ty = 0;
+    if (CENTER)
+    {
+        sx = sy = fmax(sx, sy);
+        tx = (width * scale - (double)img_width / sx) / 2;
+        ty = (height * scale - (double)img_height / sy) / 2;
+    }
+
     pixman_f_transform_t t;
     pixman_transform_t t2;
     pixman_f_transform_init_scale(&t, sx, sy);
@@ -96,7 +106,7 @@ render(struct output *output)
 
     pixman_image_composite32(
         PIXMAN_OP_SRC,
-        pix, NULL, buf->pix, 0, 0, 0, 0, 0, 0,
+        pix, NULL, buf->pix, 0, 0, 0, 0, tx, ty,
         width * scale, height * scale);
 
     pixman_image_unref(pix);
