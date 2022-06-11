@@ -65,6 +65,10 @@ if webp.found()
   add_project_arguments('-DWBG_HAVE_WEBP=1', language:'c')
 endif
 
+if get_option('center')
+  add_project_arguments('-DWBG_CENTER=1', language:'c')
+endif
+
 wayland_protocols = dependency('wayland-protocols')
 wayland_client = dependency('wayland-client')
 tllist = dependency('tllist', version: '>=1.0.1', fallback: 'tllist')
