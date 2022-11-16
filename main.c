@@ -45,6 +45,13 @@ static bool have_xrgb8888 = false;
 
 /* TODO: one per output */
 static pixman_image_t *image;
+static pixman_color_t
+    bgcolor = {
+        .red = 0x0000,
+        .green = 0x0000,
+        .blue = 0x0000,
+        .alpha = 0xffff,
+    };
 
 struct output {
     struct wl_output *wl_output;
@@ -66,6 +73,41 @@ struct output {
 };
 static tll(struct output) outputs;
 
+static int
+isxdigit(int c)
+{
+    return  (unsigned)c-'0' < 10 || ((unsigned)c|32)-'a' < 6;
+}
+
+/* Color parsing logic adapted from [sway] */
+static int
+parse_color(const char *str, pixman_color_t *clr)
+{
+    if (*str == '#')
+        str++;
+    int len = strlen(str);
+
+    // Disallows "0x" prefix that strtoul would ignore
+    if ((len != 6 && len != 8) || !isxdigit(str[0]) || !isxdigit(str[1]))
+        return 1;
+
+    char *ptr;
+    uint32_t parsed = strtoul(str, &ptr, 16);
+    if (*ptr)
+        return 1;
+
+    if (len == 8) {
+        clr->alpha = (parsed & 0xff) * 0x101;
+        parsed >>= 8;
+    } else {
+        clr->alpha = 0xffff;
+    }
+    clr->red =   ((parsed >> 16) & 0xff) * 0x101;
+    clr->green = ((parsed >>  8) & 0xff) * 0x101;
+    clr->blue =  ((parsed >>  0) & 0xff) * 0x101;
+    return 0;
+}
+
 static void
 render(struct output *output)
 {
@@ -79,13 +121,21 @@ render(struct output *output)
     if (buf == NULL)
         return;
 
+    pixman_image_fill_boxes(PIXMAN_OP_SRC, buf->pix, &bgcolor, 1,
+        &(pixman_box32_t) {.x1 = 0, .x2 = width * scale,
+                           .y1 = 0, .y2 = height * scale});
+
     uint32_t *data = pixman_image_get_data(image);
     int img_width = pixman_image_get_width(image);
     int img_height = pixman_image_get_height(image);
     int img_stride = pixman_image_get_stride(image);
     pixman_format_code_t img_fmt = pixman_image_get_format(image);
+    if (img_fmt == PIXMAN_x8r8g8b8) img_fmt = PIXMAN_a8r8g8b8;
+    if (img_fmt == PIXMAN_x8b8g8r8) img_fmt = PIXMAN_a8b8g8r8;
+    if (img_fmt == PIXMAN_r8g8b8x8) img_fmt = PIXMAN_r8g8b8a8;
+    if (img_fmt == PIXMAN_b8g8r8x8) img_fmt = PIXMAN_b8g8r8a8;
 
-    pixman_image_t *pix = pixman_image_create_bits_no_clear(
+    pixman_image_t *pix = pixman_image_create_bits(
         img_fmt, img_width, img_height, data, img_stride);
 
     double sx = (double)img_width / (width * scale);
@@ -99,7 +149,7 @@ render(struct output *output)
     pixman_image_set_filter(pix, PIXMAN_FILTER_BEST, NULL, 0);
 
     pixman_image_composite32(
-        PIXMAN_OP_SRC,
+        PIXMAN_OP_OVER,
         pix, NULL, buf->pix, 0, 0, 0, 0, 0, 0,
         width * scale, height * scale);
 
@@ -404,6 +454,10 @@ main(int argc, const char *const *argv)
         fclose(fp);
         return EXIT_FAILURE;
     }
+
+    if (argc > 2)
+        if (parse_color(argv[2], &bgcolor))
+	    fprintf(stderr, "error: malformed color string for background: '%s'\n", argv[2]);
 
     int exit_code = EXIT_FAILURE;
     int sig_fd = -1;
