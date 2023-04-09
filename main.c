@@ -41,7 +41,7 @@ static struct wl_compositor *compositor;
 static struct wl_shm *shm;
 static struct zwlr_layer_shell_v1 *layer_shell;
 
-static bool have_xrgb8888 = false;
+static bool have_argb8888 = false;
 
 /* TODO: one per output */
 static pixman_image_t *image;
@@ -293,8 +293,8 @@ static const struct wl_output_listener output_listener = {
 static void
 shm_format(void *data, struct wl_shm *wl_shm, uint32_t format)
 {
-    if (format == WL_SHM_FORMAT_XRGB8888)
-        have_xrgb8888 = true;
+    if (format == WL_SHM_FORMAT_ARGB8888)
+        have_argb8888 = true;
 }
 
 static const struct wl_shm_listener shm_listener = {
@@ -495,8 +495,8 @@ main(int argc, const char *const *argv)
 
     wl_display_roundtrip(display);
 
-    if (!have_xrgb8888) {
-        LOG_ERR("shm: XRGB image format not available");
+    if (!have_argb8888) {
+        LOG_ERR("shm: ARGB image format not available");
         goto out;
     }
 
